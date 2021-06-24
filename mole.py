@@ -28,10 +28,13 @@ import json
 import math
 from collections import UserList
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
 from random import randint, uniform
-from datetime import datetime, timedelta
+from typing import Iterable, Optional
+from time import sleep
 
+# 按钮位置，左上为 0.0 ，右下为 100.0
 button_positions = {
     "屏幕空白": (50.0, 5.0),
     "头像": (4.0, 7.0),
@@ -77,9 +80,9 @@ button_positions = {
     "任务_向导派遣_前往领奖": (74.5, 81.5),
     "任务_向导派遣_确认": (74.5, 81.5),
     "任务_向导派遣_领奖": (74.5, 81.5),
-    "任务_向导派遣_任务_2": (50.0, 45.0),  # 自上向下，从 0 递增
-    "任务_向导派遣_任务_5": (50.0, 36.5),  # 自上向下，从 0 递增
-    "任务_向导派遣_任务_15": (50.0, 65.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_0": (76.0, 17.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_1": (76.0, 31.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_2": (76.0, 45.0),  # 自上向下，从 0 递增
     "地图": (96.0, 7.0),
     "地图_X": (97.0, 5.5),
     "地图_浆果丛林": (12.5, 58.0),
@@ -179,14 +182,12 @@ button_positions = {
     "许愿_选项_1": (82.5, 45.5),  # 自下向上，从 0 递增
     "许愿_选项_2": (82.2, 33.0),  # 自下向上，从 0 递增
     "对话_继续": (70.0, 88.0),
-    "对话_选项_退出": (86.0, 57.0),  # 介于选项 0 和选项 1 之间
-    "对话_选项_0": (86.0, 59.5),  # 自下向上，从 0 递增
+    "对话_选项_0": (86.0, 57.0),  # 自下向上，从 0 递增，0 特殊处理
     "对话_选项_1": (86.0, 49.5),  # 自下向上，从 0 递增
     "对话_选项_2": (86.0, 39.5),  # 自下向上，从 0 递增
     "对话_选项_3": (86.0, 29.5),  # 自下向上，从 0 递增
     "对话_选项_4": (86.0, 19.5),  # 自下向上，从 0 递增
     "对话_选项_5": (86.0, 9.5),  # 自下向上，从 0 递增
-    "对话_选项_6": (),  # 自下向上，从 0 递增 TODO: 需要单 NPC 双任务情况
     "发言_输入": (20.0, 95.5),
     "发言_发送": (43.5, 95.0),
     "发言_X": (48.5, 49.5),
@@ -199,10 +200,12 @@ button_positions = {
     "发言_系统": (5.0, 70.0),
 }
 
+# 华东位置，左上为 0.0 ，右下为 100.0
 slide_positions = {
     "头像_设置_基础设置": (50.0, 50.0),
     "任务_向导派遣": (50.0, 50.0),
     "餐厅_菜单": (68.0, 68.0),
+    "对话_选项": (86.0, 9.5),
     "动作": (22.5, 87.5),
 }
 
@@ -219,8 +222,8 @@ class Wait(object):
     last_time: int  # 持续时间，单位为 ms
 
     def generate(self) -> list:
-        global time_now
-        time_now += self.last_time
+        global timestamp_now
+        timestamp_now += self.last_time
         return []
 
 
@@ -248,7 +251,7 @@ class Click(object):
     mouse_button: MouseButton = MouseButton.LEFT  # 鼠标按键
 
     def generate(self) -> list[dict]:
-        global time_now
+        global timestamp_now
         l = []
 
         if self.mouse_button is MouseButton.LEFT:
@@ -266,22 +269,22 @@ class Click(object):
             y = self.y
 
         for i in range(self.click_times):
-            time_now += self.delay_time
+            timestamp_now += self.delay_time
             mouse_down = {
                 "Delta": 0,
                 "EventType": button_name + "Down",
-                "Timestamp": time_now,
+                "Timestamp": timestamp_now,
                 "X": x,
                 "Y": y,
             }
             l.append(mouse_down)
 
-            time_now += self.last_time
+            timestamp_now += self.last_time
 
             mouse_up = {
                 "Delta": 0,
                 "EventType": button_name + "Up",
-                "Timestamp": time_now,
+                "Timestamp": timestamp_now,
                 "X": x,
                 "Y": y,
             }
@@ -316,7 +319,7 @@ class Drag(object):
     mouse_button: MouseButton = MouseButton.LEFT  # 鼠标按键
 
     def generate(self) -> list[dict]:
-        global time_now
+        global timestamp_now
         l = []
 
         if self.mouse_button is MouseButton.LEFT:
@@ -338,12 +341,12 @@ class Drag(object):
             x1 = self.x1
             y1 = self.y1
 
-        time_now += self.delay_time
+        timestamp_now += self.delay_time
 
         mouse_down = {
             "Delta": 0,
             "EventType": button_name + "Down",
-            "Timestamp": time_now,
+            "Timestamp": timestamp_now,
             "X": x0,
             "Y": y0,
         }
@@ -355,23 +358,23 @@ class Drag(object):
         for i in range(total_steps):
             progress = (i + 1) / total_steps
             progress = change_speed(progress)
-            time_now += self.interval_time
+            timestamp_now += self.interval_time
 
             mouse_move = {
                 "Delta": 0,
                 "EventType": "MouseMove",
-                "Timestamp": time_now,
+                "Timestamp": timestamp_now,
                 "X": x0 + dx * progress,
                 "Y": y0 + dy * progress,
             }
             l.append(mouse_move)
 
-        time_now += self.keep_time
+        timestamp_now += self.keep_time
 
         mouse_up = {
             "Delta": 0,
             "EventType": button_name + "Up",
-            "Timestamp": time_now,
+            "Timestamp": timestamp_now,
             "X": x1,
             "Y": y1,
         }
@@ -446,13 +449,13 @@ class Slide(object):
     delta: int
     x: float  # X 坐标，单位为百分比
     y: float  # Y 坐标，单位为百分比
-    delay_time: int = 300  # 延迟时间，单位为 ms
+    delay_time: int = 500  # 延迟时间，单位为 ms
     last_time: int = 3000  # 持续时间，单位为 ms
     random_delta: float = 0.0  # 随机位移，单位为百分比
     slide_times: int = 1  # 滑动次数
 
     def generate(self) -> list[dict]:
-        global time_now
+        global timestamp_now
         l = []
 
         if self.random_delta != 0.0:
@@ -463,16 +466,16 @@ class Slide(object):
             y = self.y
 
         for i in range(self.slide_times):
-            time_now += self.delay_time
+            timestamp_now += self.delay_time
             mouse_wheel = {
                 "Delta": self.delta,
                 "EventType": "MouseWheel",
-                "Timestamp": time_now,
+                "Timestamp": timestamp_now,
                 "X": x,
                 "Y": y,
             }
             l.append(mouse_wheel)
-            time_now += self.last_time
+            timestamp_now += self.last_time
 
         return l
 
@@ -502,17 +505,17 @@ class Input(object):
     last_time: int = 1000  # 持续时间，单位为 ms
 
     def generate(self) -> list[dict]:
-        global time_now
+        global timestamp_now
         l = []
 
-        time_now += self.delay_time
+        timestamp_now += self.delay_time
         input_message = {
             "EventType": "IME",
             "Msg": f"start_{self.string}_end del={self.backspace} enter={self.enter}",
-            "Timestamp": time_now,
+            "Timestamp": timestamp_now,
         }
         l.append(input_message)
-        time_now += self.last_time
+        timestamp_now += self.last_time
 
         return l
 
@@ -546,6 +549,18 @@ class Pick(ActionChain):
         self.data += [
             ClickButton("互动_主"),
             Wait(3000),
+        ]
+
+
+class GetOff(ActionChain):
+    """下车
+    坐下动作会强制取消骑乘状态"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.data += [
+            ClickButton("动作"),
+            ClickButton("动作_坐下"),
         ]
 
 
@@ -595,8 +610,12 @@ class Navigate2NPC(ActionChain):
     def __init__(self, name: str, last_time: int = 120000) -> None:
         super().__init__()
         _y = button_positions["地图_角色功能切换"][1]
-        self.data += [ClickButton("地图"), Drag(20.0, _y, 80.0, _y)]
+        self.data += [
+            ClickButton("地图"),
+            Drag(20.0, _y, 80.0, _y),
+        ]
 
+        # 需要翻页
         if name in (
             "汤米",
             "梅森",
@@ -613,11 +632,16 @@ class Navigate2NPC(ActionChain):
             ClickButton("地图_角色_" + name),
             Wait(last_time),
             ClickButton("对话_继续"),
-            ClickButton("对话_选项_退出"),
-            Wait(3000),
-            ClickButton("互动_主"),
-            ClickButton("对话_继续"),
         ]
+        if name != "克劳":
+            # 通过重进对话来刷新选项并重置位置
+            # 克劳处空间狭小，可能卡住
+            self.data += [
+                ClickButton("对话_选项_0"),
+                Wait(3000),
+                ClickButton("互动_主"),
+                ClickButton("对话_继续"),
+            ]
 
 
 class Navigate2Feature(ActionChain):
@@ -657,7 +681,6 @@ class InitSettings(ActionChain):
             ClickButton("头像_设置_X_确定"),
             Wait(5000),
             ClickButton("屏幕空白"),
-            ChangeMap("家园"),
         ]
 
 
@@ -696,7 +719,7 @@ class Divine(ActionChain):
         super().__init__()
         self.data = [
             Navigate2Feature("茜茜占卜"),
-            ClickButton("对话_选项_退出"),
+            ClickButton("对话_选项_0"),
             Wait(3000),
             ClickButton("互动_主"),
             ClickButton("对话_继续"),
@@ -724,15 +747,16 @@ class MakeWish(ActionChain):
         super().__init__()
         self.data = [
             ChangeMap("爱心街区"),
-            Navigate2Feature("城堡许愿池", 5000),
+            Navigate2Feature("城堡许愿池", 3000),
             ClickButton("互动_主"),
+            Wait(3000),
             ClickButton("许愿_继续"),
-            ClickButton("许愿_继续"),
+            ClickButton("许愿_选项_0"),
             ClickButton("屏幕空白"),
             Wait(1000),
             ClickButton("互动_主"),
+            Wait(10000),
             ClickButton("许愿_继续"),
-            Wait(1000),
             ClickButton(f"许愿_选项_{randint(0, 2)}"),
             ClickButton("许愿_继续"),
             ClickButton("许愿_继续"),
@@ -741,7 +765,9 @@ class MakeWish(ActionChain):
 
 
 class GuiderMission(ActionChain):
-    """向导任务"""
+    """向导任务
+    穿向导服
+    默认选头三个任务：摩尔城堡，摩尔拉雅雪山，浆果丛林"""
 
     def __init__(self) -> None:
         super().__init__()
@@ -753,45 +779,45 @@ class GuiderMission(ActionChain):
             Wait(10000),
             ClickButton("对话_选项_3"),
             Wait(1000),
-            SlideUp("任务_向导派遣", slide_times=3),
+            ClickButton("任务_向导派遣_任务_0"),
+            ClickButton("任务_向导派遣_任务_1"),
             ClickButton("任务_向导派遣_任务_2"),
-            SlideDown("任务_向导派遣"),
-            ClickButton("任务_向导派遣_任务_5"),
-            SlideDown("任务_向导派遣", slide_times=3),
-            ClickButton("任务_向导派遣_任务_15"),
             ClickButton("任务_向导派遣_确认"),
             ClickButton("屏幕空白"),
             Wait(1000),
         ]
 
+        self.do()  # 接取任务后就在摩尔城堡，无须换图
         self.do("摩尔拉雅")
-        self.do("阳光牧场")
         self.do("浆果丛林")
 
         self.data += [
-            ChangeMap("淘淘乐街"),
+            ChangeMap("摩尔城堡"),
             ClickButton("任务"),
             ClickButton("任务_向导派遣"),
             ClickButton("任务_向导派遣_前往领奖"),
-            Wait(30000),
+            Wait(10000),
             ClickButton("对话_选项_3"),
             ClickButton("任务_向导派遣_领奖"),
             ClickButton("屏幕空白"),
             Wait(1000),
         ]
 
-    def do(self, where: str) -> None:
+    def do(self, where: Optional[str] = None) -> None:
+        if where:
+            self.data.append(ChangeMap(where))
+
         self.data += [
-            ChangeMap(where),
             ClickButton("动作"),
             SlideDown("动作"),
             ClickButton("动作__服装动作"),
-            Wait(30000),
+            Wait(21000),
         ]
 
 
 class GatherForest(ActionChain):
-    """伐木林资源采集"""
+    """伐木林资源采集
+    不保证全部采集，但刷满 SMC 经验足以"""
 
     def __init__(self) -> None:
         super().__init__()
@@ -823,7 +849,8 @@ class GatherForest(ActionChain):
 
 class GatherMoerlaya(ActionChain):
     """摩尔拉雅资源采集
-    5 个白浆果"""
+    5 个白浆果
+    夜间 5轮"""
 
     def __init__(self, n: int = 5) -> None:
         super().__init__()
@@ -848,13 +875,14 @@ class GatherMoerlaya(ActionChain):
             MoveRight(500),
             Pick(),
             Navigate2NPC("茜茜", 20000),
-            ClickButton("对话_选项_退出"),
-            MoveRight(300),
-            MoveDown(500),
+            ClickButton("对话_选项_0"),
+            MoveRight(100),
+            MoveDown(1200),
             Pick(),
             ClickButton("骑乘"),
             MoveRight(4300),
             MoveUp(500),
+            MoveRight(300),
             Pick(),
         ]
 
@@ -862,7 +890,8 @@ class GatherMoerlaya(ActionChain):
 class GatherQianShaoZhan(ActionChain):
     """前哨站资源采集
     13 个黑浆果
-    1 个草丛（剩余两个草丛距离远，浆果刷新快，暂时不采集）"""
+    1 个草丛（剩余两个草丛距离远，浆果刷新快，暂时不采集）
+    夜间 5 轮"""
 
     def __init__(self, n: int = 5) -> None:
         super().__init__()
@@ -874,7 +903,7 @@ class GatherQianShaoZhan(ActionChain):
     def prepare(self) -> None:
         self.data += [
             Navigate2NPC("瑞琪", 30000),
-            ClickButton("对话_选项_退出"),
+            ClickButton("对话_选项_0"),
             ClickButton("骑乘"),
             MoveDown(1300),
             MoveRight(3500),
@@ -920,7 +949,7 @@ class GatherQianShaoZhan(ActionChain):
             MoveLeft(11050),
             Pick(),
             ClickButton("骑乘"),
-            MoveLeft(3050),
+            MoveLeft(3100),
             MoveUp(1500),
             Pick(),
             ClickButton("骑乘"),
@@ -945,26 +974,43 @@ class GatherJiangGuoCongLin(ActionChain):
 
     def __init__(self, n: int = 5) -> None:
         super().__init__()
-        self.data.append(ChangeMap("浆果丛林"))
-        return
+        # self.data.append(ChangeMap("浆果丛林"))
         self.prepare()
         for i in range(n):
             self.do()
+            break
 
     def prepare(self):
-        self.data += [
-            MoveDown(),
-        ]
+        self.data.append(MoveDown(2300))
 
     def do(self) -> None:
         self.data += [
             Pick(),
             ClickButton("骑乘"),
-            MoveUp(),
-            MoveDown(),
-            MoveLeft(),
-            MoveRight(),
+            MoveLeft(1600),
+            MoveUp(1800),
+            MoveRight(500),
+            Pick(),
+            ClickButton("骑乘"),
+            MoveLeft(1400),
+            MoveUp(1300),
+            Pick(),
+            ClickButton("骑乘"),
+            MoveUp(1500),
+            MoveRight(2000),
+            Pick(),
+            ClickButton("骑乘"),
+            MoveRight(1500),
+            MoveUp(1500),
+            MoveRight(2000),
+            Pick(),
+            ClickButton("骑乘"),
+            MoveUp(2000),
+            MoveRight(1500),
+            Pick(),
+            ClickButton("骑乘"),
         ]
+        return
         [
             Pick(),
             ClickButton("骑乘"),
@@ -976,8 +1022,7 @@ class GatherJiangGuoCongLin(ActionChain):
 
 
 class Talk2NPC(ActionChain):
-    """NPC 对话好感度
-    NPC 日常任务已完成"""
+    """NPC 对话好感度"""
 
     def __init__(self) -> None:
         super().__init__()
@@ -1011,25 +1056,21 @@ class Talk2NPC(ActionChain):
 
     def next(self) -> None:
         self.data += [
+            ClickButton("对话_选项_0"),
+            ClickButton("对话_选项_1"),
             ClickButton("对话_继续"),
-            ClickButton("对话_选项_退出"),
         ]
 
     def do(self, name: str) -> None:
-        # 克劳处空间狭小，可能卡住
-        if name == "克劳":
-            self.data += [
-                ClickButton("对话_选项_退出"),
-                MoveUp(50),
-                MoveRight(100),
-                ClickButton("互动_主"),
-            ]
         choice = {
             "杰西": 2,
             "琦琦": 2,
         }
         n = choice.get(name, 1)
-        self.data.append(ClickButton("对话_选项_" + str(n)))
+        self.data += [
+            SlideDown("对话_选项"),  #  应对 NPC 对话选项多于 6 个的情况
+            ClickButton("对话_选项_" + str(n)),
+        ]
         for i in range(3):
             self.next()
         self.data.append(Wait(1000))
@@ -1037,7 +1078,8 @@ class Talk2NPC(ActionChain):
 
 class Cook(ActionChain):
     """烹饪
-    4 炉空
+    扩建过一次的厨房
+    4 个炉子都是空的
     上菜窗口无空缺
     上菜窗口无对应菜品（浆果捞）"""
 
@@ -1080,6 +1122,8 @@ class Cook(ActionChain):
             ClickButton("餐厅_提示_取消"),  # 相当于点击屏幕空白，防错位
             SlideDown("餐厅_菜单"),
             Click(52.0, 77.5, random_delta=0.5),
+            # 第二列坐标
+            # Click(63.0, 77.5, random_delta=0.5),
             ClickButton("餐厅_菜谱_快速烹饪"),
             Wait(500),
         ]
@@ -1111,24 +1155,20 @@ class GoFishing(ActionChain):
         ]
 
 
-class Mission(ActionChain):
-    """TODO: 庄园任务"""
-
-
-def export(actions: list, name: str, **kwargs) -> None:
+def export(actions: Iterable, name: str, **kwargs) -> None:
     """导出 BlueStacks 可用的 json 文件"""
-    global time_now
-    time_now = 0
+    global timestamp_now
+    timestamp_now = 0
     events = []
     for action in actions:
-        events += action.generate()
+        events.extend(action.generate())
     data = {
         "Acceleration": 1,
         "CreationTime": datetime.now().strftime("%Y%m%dT%H%M%S"),
         "DoNotShowWindowOnFinish": False,
         "Events": events,
         "LoopDuration": 0,  # TillTIme 模式下有效，循环时长，单位为 s
-        "LoopInterval": 0,  # 循环间隔，单位为秒
+        "LoopInterval": 0,  # 循环间隔，单位为 s
         "LoopIterations": 1,  # TillLoopNumber 模式下有效，循环次数
         "LoopType": "TillLoopNumber",  # "TillLoopNumber" "TillTime" "UntilStopped"
         "MacroSchemaVersion": 2,
@@ -1138,21 +1178,48 @@ def export(actions: list, name: str, **kwargs) -> None:
     data |= kwargs
     with open(f"./json/{name}.json", "wt", encoding="utf-8") as f:
         json.dump(data, f)
-    print(f"{name}: {timedelta(milliseconds=time_now)}")
+    print(f"{name}: {timedelta(milliseconds=timestamp_now)}")
+
+
+def debug(actions: Iterable) -> None:
+    """对应时间输出事件"""
+
+    from pprint import pp
+    from sys import exit
+
+    export(actions, f"DEBUG_{datetime.now().strftime('%H-%M-%S')}")
+    sleep(5)
+    global timestamp_now
+    timestamp_now = 0
+    events = []
+    for action in actions:
+        events.extend(action.generate())
+
+    timestamp = 0
+    for event in events:
+        sleep((event["Timestamp"] - timestamp) / 1000.0)
+        timestamp = event["Timestamp"]
+        print(f"{'#'*30} {timedelta(milliseconds=timestamp)}")
+        pp(event)
+
+    exit()
 
 
 if __name__ == "__main__":
+    # debug(GatherJiangGuoCongLin())
+
     export(InitSettings(), "初始化设置")
-    export(CheckIn(), "签到")
-    export(Divine(), "占卜")
-    export(MakeWish(), "许愿")
-    export(GuiderMission(), "向导任务")
-    export(GatherForest(), "伐木林采集")
-    export(Cook(), "烹饪")
-    export(Talk2NPC(), "NPC对话")
+    export(CheckIn(), "日常签到")
+    export(Divine(), "日常占卜")
+    export(MakeWish(), "日常许愿")
+    export(GuiderMission(), "日常向导任务")
     export(GatherMoerlaya(), "摩尔拉雅采集")
     export(GatherQianShaoZhan(), "前哨站采集")
-    export(GatherJiangGuoCongLin(), "浆果丛林采集")
+    # export(GatherJiangGuoCongLin(), "浆果丛林采集")
+    export(Talk2NPC(), "日常 NPC 好感度对话")
+    export([ClickButton("互动_主", delay_time=300)], "辅助互动", LoopType="UntilStopped")
+    export(GatherForest(), "辅助伐木林采集")
+    export(Cook(), "烹饪")
     export(
         InitSettings()
         + CheckIn()
@@ -1160,5 +1227,5 @@ if __name__ == "__main__":
         + MakeWish()
         + GuiderMission()
         + Talk2NPC(),
-        "main",
+        "日常整合",
     )
