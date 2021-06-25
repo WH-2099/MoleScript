@@ -144,13 +144,12 @@ button_positions = {
     "好友": (30.0, 94.0),
     "表情": (37.0, 82.5),
     "动作": (44.5, 82.5),
-    "动作_挥手": (16.5, 80.5),
-    "动作_跳舞": (23.0, 80.5),
-    "动作_摇摆": (29.5, 80.5),
-    "动作_坐下": (16.5, 93.5),
-    "动作_鼓掌": (23.0, 93.5),
-    "动作_大笑": (29.5, 93.5),
-    "动作__服装动作": (16.5, 93.5),
+    "动作_0": (16.5, 80.5), # 自左向右，自上而下，从 0 递增
+    "动作_1": (23.0, 80.5), # 自左向右，自上而下，从 0 递增
+    "动作_2": (29.5, 80.5), # 自左向右，自上而下，从 0 递增
+    "动作_3": (16.5, 93.5), # 自左向右，自上而下，从 0 递增
+    "动作_4": (23.0, 93.5), # 自左向右，自上而下，从 0 递增
+    "动作_5": (29.5, 93.5), # 自左向右，自上而下，从 0 递增
     "投掷": (52.0, 82.5),
     "互动_主": (85.0, 75.0),
     "互动_副": (76.5, 65.0),
@@ -560,7 +559,7 @@ class GetOff(ActionChain):
         super().__init__()
         self.data += [
             ClickButton("动作"),
-            ClickButton("动作_坐下"),
+            ClickButton("动作_5"),
         ]
 
 
@@ -809,9 +808,9 @@ class GuiderMission(ActionChain):
 
         self.data += [
             ClickButton("动作"),
-            SlideDown("动作"),
-            ClickButton("动作__服装动作"),
-            Wait(21000),
+            ClickButton("动作_2"),
+            Wait(20000),
+            Wait(1000),
         ]
 
 
@@ -861,6 +860,7 @@ class GatherMoerlaya(ActionChain):
     def do(self) -> None:
         self.data += [
             ChangeMap("摩尔拉雅", 25000),
+            GetOff(),
             ClickButton("骑乘"),
             MoveUp(500),
             MoveRight(1400),
@@ -981,7 +981,12 @@ class GatherJiangGuoCongLin(ActionChain):
             break
 
     def prepare(self):
-        self.data.append(MoveDown(2300))
+
+        self.data += [
+            GetOff(),
+            ClickButton("骑乘"),
+            MoveDown(2300),
+        ]
 
     def do(self) -> None:
         self.data += [
