@@ -144,16 +144,17 @@ button_positions = {
     "好友": (30.0, 94.0),
     "表情": (37.0, 82.5),
     "动作": (44.5, 82.5),
-    "动作_0": (16.5, 80.5), # 自左向右，自上而下，从 0 递增
-    "动作_1": (23.0, 80.5), # 自左向右，自上而下，从 0 递增
-    "动作_2": (29.5, 80.5), # 自左向右，自上而下，从 0 递增
-    "动作_3": (16.5, 93.5), # 自左向右，自上而下，从 0 递增
-    "动作_4": (23.0, 93.5), # 自左向右，自上而下，从 0 递增
-    "动作_5": (29.5, 93.5), # 自左向右，自上而下，从 0 递增
+    "动作_0": (16.5, 80.5),  # 自左向右，自上而下，从 0 递增
+    "动作_1": (23.0, 80.5),  # 自左向右，自上而下，从 0 递增
+    "动作_2": (29.5, 80.5),  # 自左向右，自上而下，从 0 递增
+    "动作_3": (16.5, 93.5),  # 自左向右，自上而下，从 0 递增
+    "动作_4": (23.0, 93.5),  # 自左向右，自上而下，从 0 递增
+    "动作_5": (29.5, 93.5),  # 自左向右，自上而下，从 0 递增
     "投掷": (52.0, 82.5),
     "互动_主": (85.0, 75.0),
     "互动_副": (76.5, 65.0),
     "互动_钓鱼": (86.0, 69.0),
+    "钓鱼_停止钓鱼": (8.5, 6.5),
     "钓鱼_鱼饵": (96.5, 70.0),
     "钓鱼_鱼饵_X": (84.5, 84.5),
     "钓鱼_鱼饵_0": (19.5, 93.0),  # 自左向右，从 0 递增
@@ -853,7 +854,6 @@ class GatherMoerlaya(ActionChain):
 
     def __init__(self, n: int = 5) -> None:
         super().__init__()
-        self.data.append(ChangeMap("摩尔拉雅"))
         for i in range(5):
             self.do()
 
@@ -890,12 +890,11 @@ class GatherMoerlaya(ActionChain):
 class GatherQianShaoZhan(ActionChain):
     """前哨站资源采集
     13 个黑浆果
-    1 个草丛（剩余两个草丛距离远，浆果刷新快，暂时不采集）
+    1 个草丛（剩余两个草丛距离远，而黑浆果刷新快，暂时不采集）
     夜间 5 轮"""
 
     def __init__(self, n: int = 5) -> None:
         super().__init__()
-        self.data.append(ChangeMap("前哨站"))
         self.prepare()
         for i in range(n):
             self.do()
@@ -1081,6 +1080,20 @@ class Talk2NPC(ActionChain):
         self.data.append(Wait(1000))
 
 
+class StirFry(ActionChain):
+    """TODO: 炒菜"""
+
+    def __init__(self, n: int) -> None:
+        super().__init__()
+        for i in range(n):
+            self.do()
+
+    def do(self):
+        self.data += [
+            ClickButton("互动_主"),
+        ]
+
+
 class Cook(ActionChain):
     """烹饪
     扩建过一次的厨房
@@ -1088,10 +1101,10 @@ class Cook(ActionChain):
     上菜窗口无空缺
     上菜窗口无对应菜品（浆果捞）"""
 
-    def __init__(self, cook_times: int = 10) -> None:
+    def __init__(self, n: int = 10) -> None:
         super().__init__()
         self.prepare(wait=8000)
-        for i in range(cook_times):
+        for i in range(n):
             self.do()
 
     def prepare(self, wait: int) -> None:
@@ -1137,26 +1150,33 @@ class Cook(ActionChain):
         self.data.append(MoveLeft(5))
 
 
-class GoFishing(ActionChain):
+class Fish(ActionChain):
     """TODO: 钓鱼"""
 
-    def __init__(self) -> None:
+    def __init__(self, n: int = 150) -> None:
         super().__init__()
+        for i in range(n):
+            self.do()
+        self.append(Wait(1000))
+
+    def change_bait(self) -> None:
+        """"换最低等的鱼饵"""
         self.data += [
+            ClickButton("互动_钓鱼"),
+            ClickButton("互动_钓鱼"),
             ClickButton("钓鱼_鱼饵"),
             ClickButton("钓鱼_鱼饵_0"),
+            ClickButton("钓鱼_停止钓鱼"),
         ]
-        for i in range(100):
-            self.do()
 
     def do(self):
+        "稳健，不丢饵"
         self.data += [
-            ClickButton("互动_主"),
-            Wait(1000),
-            ClickButton("互动_主", delay_time=0),
-            Wait(1000),
-            ClickButton("互动_主", delay_time=0),
-            ClickButton("屏幕空白"),
+            ClickButton("互动_钓鱼", delay_time=500),  # 下钩
+            ClickButton("互动_钓鱼", delay_time=6000),  # 上钩
+            ClickButton("互动_钓鱼", delay_time=2000),  # 收杆
+            ClickButton("钓鱼_停止钓鱼", delay_time=300),
+            ClickButton("屏幕空白", delay_time=2000),
         ]
 
 
@@ -1186,26 +1206,27 @@ def export(actions: Iterable, name: str, **kwargs) -> None:
     print(f"{name}: {timedelta(milliseconds=timestamp_now)}")
 
 
-def debug(actions: Iterable) -> None:
+def debug(actions: Iterable, track: bool = True) -> None:
     """对应时间输出事件"""
 
     from pprint import pp
     from sys import exit
 
     export(actions, f"DEBUG_{datetime.now().strftime('%H-%M-%S')}")
-    sleep(5)
-    global timestamp_now
-    timestamp_now = 0
-    events = []
-    for action in actions:
-        events.extend(action.generate())
+    if track:
+        sleep(5)
+        global timestamp_now
+        timestamp_now = 0
+        events = []
+        for action in actions:
+            events.extend(action.generate())
 
-    timestamp = 0
-    for event in events:
-        sleep((event["Timestamp"] - timestamp) / 1000.0)
-        timestamp = event["Timestamp"]
-        print(f"{'#'*30} {timedelta(milliseconds=timestamp)}")
-        pp(event)
+        timestamp = 0
+        for event in events:
+            sleep((event["Timestamp"] - timestamp) / 1000.0)
+            timestamp = event["Timestamp"]
+            print(f"{'#'*30} {timedelta(milliseconds=timestamp)}")
+            pp(event)
 
     exit()
 
@@ -1218,13 +1239,14 @@ if __name__ == "__main__":
     export(Divine(), "日常占卜")
     export(MakeWish(), "日常许愿")
     export(GuiderMission(), "日常向导任务")
-    export(GatherMoerlaya(), "摩尔拉雅采集")
-    export(GatherQianShaoZhan(), "前哨站采集")
-    # export(GatherJiangGuoCongLin(), "浆果丛林采集")
     export(Talk2NPC(), "日常 NPC 好感度对话")
     export([ClickButton("互动_主", delay_time=300)], "辅助互动", LoopType="UntilStopped")
+    export(Fish(1), "辅助钓鱼", LoopType="UntilStopped")
     export(GatherForest(), "辅助伐木林采集")
-    export(Cook(), "烹饪")
+    export(GatherMoerlaya(), "辅助摩尔拉雅采集")
+    export(GatherQianShaoZhan(), "辅助前哨站采集")
+    # export(GatherJiangGuoCongLin(), "辅助浆果丛林采集")
+    # export(Cook(), "烹饪")
     export(
         InitSettings()
         + CheckIn()
