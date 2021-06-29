@@ -210,6 +210,9 @@ slide_positions = {
     "动作": (22.5, 87.5),
 }
 
+# 私房菜操作
+menu_operation = {"浆果捞": ()}
+
 
 def change_speed(input: float) -> float:
     """将线性输入 [0.0, 1.0] 变速，非线性输出 [0.0, 1.0]"""
@@ -231,9 +234,9 @@ class Wait(object):
 class MouseButton(Enum):
     """鼠标按钮枚举"""
 
-    LEFT = 0
-    RIGHT = 1
-    MIDDLE = 2
+    LEFT = "Mouse"
+    RIGHT = "MouseRButton"
+    MIDDLE = "MouseMButton"
     L = LEFT
     R = RIGHT
     M = MIDDLE
@@ -255,14 +258,7 @@ class Click(object):
         global timestamp_now
         l = []
 
-        if self.mouse_button is MouseButton.LEFT:
-            button_name = "Mouse"
-        elif self.mouse_button is MouseButton.RIGHT:
-            button_name = "MouseRButton"
-        elif self.mouse_button is MouseButton.MIDDLE:
-            button_name = "MouseMButton"
-
-        if self.random_delta != 0.0:
+        if self.random_delta:
             x = self.x + uniform(-self.random_delta, self.random_delta)
             y = self.y + uniform(-self.random_delta, self.random_delta)
         else:
@@ -273,7 +269,7 @@ class Click(object):
             timestamp_now += self.delay_time
             mouse_down = {
                 "Delta": 0,
-                "EventType": button_name + "Down",
+                "EventType": self.mouse_button.value + "Down",
                 "Timestamp": timestamp_now,
                 "X": x,
                 "Y": y,
@@ -284,7 +280,7 @@ class Click(object):
 
             mouse_up = {
                 "Delta": 0,
-                "EventType": button_name + "Up",
+                "EventType": self.mouse_button.value + "Up",
                 "Timestamp": timestamp_now,
                 "X": x,
                 "Y": y,
@@ -323,14 +319,7 @@ class Drag(object):
         global timestamp_now
         l = []
 
-        if self.mouse_button is MouseButton.LEFT:
-            button_name = "Mouse"
-        elif self.mouse_button is MouseButton.RIGHT:
-            button_name = "MouseRButton"
-        elif self.mouse_button is MouseButton.MIDDLE:
-            button_name = "MouseMButton"
-
-        if self.random_delta != 0.0:
+        if self.random_delta:
             delta = uniform(-self.random_delta, self.random_delta)
             x0 = self.x0 + delta
             y0 = self.y0 + delta
@@ -346,7 +335,7 @@ class Drag(object):
 
         mouse_down = {
             "Delta": 0,
-            "EventType": button_name + "Down",
+            "EventType": self.mouse_button.value + "Down",
             "Timestamp": timestamp_now,
             "X": x0,
             "Y": y0,
@@ -374,7 +363,7 @@ class Drag(object):
 
         mouse_up = {
             "Delta": 0,
-            "EventType": button_name + "Up",
+            "EventType": self.mouse_button.value + "Up",
             "Timestamp": timestamp_now,
             "X": x1,
             "Y": y1,
@@ -459,7 +448,7 @@ class Slide(object):
         global timestamp_now
         l = []
 
-        if self.random_delta != 0.0:
+        if self.random_delta:
             x = self.x + uniform(-self.random_delta, self.random_delta)
             y = self.y + uniform(-self.random_delta, self.random_delta)
         else:
@@ -495,6 +484,78 @@ class SlideUp(Slide):
     def __init__(self, name: str, **kwargs) -> None:
         kwargs["random_delta"] = 0.5
         super().__init__(120, *slide_positions[name], **kwargs)
+
+
+@dataclass
+class DrawCircle(object):
+    """画圆"""
+
+    x: float  # 圆心 X 坐标，单位为百分比
+    y: float  # 圆心 Y 坐标，单位为百分比
+    r: float  # 半径，单位为百分比t
+    clockwise: bool = False  # 转动方向，默认逆时针
+    turns_number: int = 1  # 转动圈数
+    delay_time: int = 300  # 延迟时间，单位为 ms
+    last_time: int = 1000  # 持续时间，单位为 ms
+    random_delta: float = 0.0  # 随机位移，单位为百分比
+    fragment_number: int = 36  # 一圈的分段数量
+    mouse_button: MouseButton = MouseButton.LEFT  # 鼠标按键
+
+    def _move(self, _x: float, _y: float) -> dict:
+        global timestamp_now
+
+        if self.random_delta:
+            _x += uniform(-self.random_delta, self.random_delta)
+            _y += uniform(-self.random_delta, self.random_delta)
+
+        mouse_move = {
+            "Delta": 0,
+            "EventType": "MouseMove",
+            "Timestamp": timestamp_now,
+            "X": _x,
+            "Y": _y,
+        }
+        return mouse_move
+
+    def generate(self) -> list[dict]:
+        global timestamp_now
+        l = []
+
+        timestamp_now += self.delay_time
+        mouse_down = {
+            "Delta": 0,
+            "EventType": self.mouse_button.value + "Down",
+            "Timestamp": timestamp_now,
+            "X": self.x + self.r,
+            "Y": self.y,
+        }
+        l.append(mouse_down)
+
+        d_time = self.last_time // (self.turns_number * self.fragment_number)
+        end_time = timestamp_now + self.last_time
+        theta = 0.0
+        d_theta = math.pi * 2 / self.fragment_number
+        d_theta = -d_theta if self.clockwise else +d_theta  #  数学坐标系顺时针为负向
+        for i in range(self.turns_number * self.fragment_number):
+            timestamp_now += d_time
+            theta += d_theta
+            _x = self.x + math.cos(theta) * self.r
+            _y = self.y - math.sin(theta) * self.r  # 屏幕坐标系需要翻转 y 轴
+            mouse_move = self._move(_x, _y)
+            l.append(mouse_move)
+
+        timestamp_now = end_time
+
+        mouse_up = {
+            "Delta": 0,
+            "EventType": self.mouse_button.value + "Up",
+            "Timestamp": timestamp_now,
+            "X": _x,
+            "Y": _y,
+        }
+        l.append(mouse_up)
+
+        return l
 
 
 @dataclass
@@ -581,15 +642,17 @@ class ClickArea(ActionChain):
     """区域点击"""
 
     def __init__(
-        self, x0: float, y0: float, x1: float, y1: float, delta: float = 10.0
+        self, x0: float, y0: float, x1: float, y1: float, delta: float = 10.0, **kwargs
     ) -> None:
         super().__init__()
         for i in range((x1 - x0) // delta):
             x = x0 + (i + 1) * delta
             for j in range((y1 - y0) // delta):
                 y = y0 + (j + 1) * delta
-                self.data.append(Click(x, y, delay_time=300 + randint(0, 500)))
-        self.data.append(Wait(3000))  # 等待响应
+                self.data.append(
+                    Click(x, y, delay_time=100 + randint(0, 50), **kwargs)
+                )  #  加入随机延迟
+        self.data.append(Wait(1000))
 
 
 class Speak(ActionChain):
@@ -732,12 +795,9 @@ class Divine(ActionChain):
 
     def __init__(self) -> None:
         super().__init__()
-        self.data = [
-            Navigate2Feature("茜茜占卜"),
-            ClickButton("对话_选项_0"),
-            Wait(3000),
-            ClickButton("互动_主"),
-            ClickButton("对话_继续"),
+        self.data.append(Navigate2Feature("茜茜占卜"))
+        self.refresh_conversation(5)
+        self.data += [
             ClickButton("对话_选项_3"),
             Wait(1500),
             Drag(
@@ -754,13 +814,23 @@ class Divine(ActionChain):
             Wait(1000),
         ]
 
+    def refresh_conversation(self, n: int) -> None:
+        """重复进出对话，刷新对话选项"""
+        for i in range(n):
+            self.data += [
+                ClickButton("对话_选项_0"),  # 重复进出对话，刷新对话选项
+                Wait(1000),
+                ClickButton("互动_主"),
+                ClickButton("对话_继续"),
+            ]
+
 
 class MakeWish(ActionChain):
     """许愿"""
 
     def __init__(self) -> None:
         super().__init__()
-        self.data = [
+        self.data += [
             ChangeMap("爱心街区"),
             Navigate2Feature("城堡许愿池", 3000),
             ClickButton("互动_主"),
@@ -1100,6 +1170,18 @@ class GatherChengBaoArea(ActionChain):
         ]
 
 
+class GatherMapResouce(ActionChain):
+    """TODO: 日常资源采集"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.data += [
+            ResetVisualAngel(),
+            ChangeMap("浆果丛林"),
+        ]
+        self.data.extend(GatherJiangGuoCongLin())
+
+
 class Talk2NPC(ActionChain):
     """NPC 对话好感度"""
 
@@ -1116,16 +1198,16 @@ class Talk2NPC(ActionChain):
             "琦琦": 25000,
             "艾米": 10000,
             "汤米": 15000,
-            "克劳": 90000,
-            "弗礼德": 90000,
+            "克劳": 120000,
+            "弗礼德": 120000,
             "茜茜": 120000,
             "贝琪": 30000,
             "艾尔": 150000,
             "尤尤": 150000,
             "菩提": 35000,
             "梅森": 40000,
-            "彩虹": 90000,
-            "瑞琪": 90000,
+            "彩虹": 120000,
+            "瑞琪": 120000,
         }
         self.data.append(ChangeMap("摩尔城堡"))
         for name, time in self.NPCs.items():
@@ -1175,6 +1257,7 @@ class StirFry(ActionChain):
     def do(self) -> None:
         self.data += [
             ClickButton("互动_主"),
+            DrawCircle(50.0, 58.0, 15.0, clockwise=True, turns_number=10, last_time=10),
         ]
 
 
@@ -1235,24 +1318,30 @@ class Cook(ActionChain):
         self.data.append(MoveLeft(5))
 
 
-class Fish(ActionChain):
-    """钓鱼"""
+class ChooseBait(ActionChain):
+    """选择鱼饵
+    序号从左往右，从 0 递增"""
 
-    def __init__(self, n: int = 150) -> None:
+    def __init__(self, n: int) -> None:
         super().__init__()
-        for i in range(n):
-            self.do()
-        self.append(Wait(1000))
-
-    def change_bait(self) -> None:
-        """"换最低等的鱼饵"""
         self.data += [
             ClickButton("互动_钓鱼"),
             ClickButton("互动_钓鱼"),
             ClickButton("钓鱼_鱼饵"),
-            ClickButton("钓鱼_鱼饵_0"),
+            ClickButton("钓鱼_鱼饵_" + str(n)),
             ClickButton("钓鱼_停止钓鱼"),
+            Wait(1000),
         ]
+
+
+class Fish(ActionChain):
+    """钓鱼"""
+
+    def __init__(self, n: int = 200) -> None:
+        super().__init__()
+        for i in range(n):
+            self.do()
+        self.append(Wait(1000))
 
     def do(self) -> None:
         "稳健，不丢饵"
@@ -1263,6 +1352,26 @@ class Fish(ActionChain):
             ClickButton("钓鱼_停止钓鱼", delay_time=300),
             ClickButton("屏幕空白", delay_time=2000),
         ]
+
+
+class DailyFish(ActionChain):
+    """TODO: 日常钓鱼"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.data += [
+            ResetVisualAngel(),
+            ChangeMap("摩尔拉雅"),
+            ChooseBait(0),
+            Fish(),
+            ChangeMap("浆果丛林"),
+            ChooseBait(0),
+            Fish(),
+            ChangeMap("阳光沙滩"),
+            ChooseBait(0),
+            Fish(),
+        ]
+        self.append(Wait(1000))
 
 
 def export(actions: Iterable, name: str, **kwargs) -> None:
@@ -1350,7 +1459,9 @@ if __name__ == "__main__":
     export(GatherForest(), "辅助伐木林采集")
     export(GatherMoerlaya(), "辅助摩尔拉雅采集")
     export(GatherQianShaoZhan(), "辅助前哨站采集")
-    export(GatherJiangGuoCongLin(), "辅助浆果丛林采集")
+    export(
+        GatherJiangGuoCongLin(), "辅助浆果丛林采集", LoopType="UntilStopped", LoopInterval=3600
+    )
 
     # 自定义功能
     # export(Speak(), "发言", LoopType="UntilStopped", LoopInterval=120)
