@@ -34,6 +34,22 @@ from random import randint, uniform
 from time import sleep
 from typing import Iterable, Optional
 
+
+# 神奇密码
+magic_codes = {
+    "夏日前奏",
+    "夏日季来啦",
+    "一起去旅行",
+    "一起过夏天",
+    "快乐炸鸡桶",
+    "摩尔庄园美食抖音复刻",
+    "雷霆游戏情报站",
+    "摩尔餐厅即将上新",
+    "艾米的小伙伴",
+    "下载Ganke领福利",
+}
+
+
 # 按钮位置，左上为 0.0 ，右下为 100.0
 button_positions = {
     "屏幕空白": (50.0, 5.0),
@@ -131,6 +147,13 @@ button_positions = {
     "支线": (10.5, 21.0),
     "日常": (16.5, 21.0),
     "活动": (81.0, 15.5),
+    "活动_X": (92.0, 4.0),
+    "活动_活动": (5.5, 18.5),
+    "活动_福利": (5.5, 35.5),
+    "活动_福利_神奇密码": (16.0, 18.0),
+    "活动_福利_神奇密码_神奇密码兑换": (50.0, 63.0),
+    "活动_福利_神奇密码_神奇密码兑换_输入": (50.0, 49.5),
+    "活动_福利_神奇密码_神奇密码兑换_确定": (58.5, 63.0),
     "扭蛋机": (86.0, 15.5),
     "新手目标": (91.0, 15.5),
     "店铺": (96.0, 15.5),
@@ -173,10 +196,13 @@ button_positions = {
     "餐厅_菜谱": (96.0, 63.0),
     "餐厅_菜谱_前往": (25.5, 86.5),
     "餐厅_菜谱_快速烹饪": (25.5, 86.5),
+    "餐厅_菜谱_快速制作": (19.0, 87.0),
+    "餐厅_菜谱_制作": (31.5, 87.0),
     "餐厅_管理": (96.0, 72.5),
     "餐厅_管理_开始营业": (48.5, 78.0),
     "餐厅_管理_领取": (48.0, 77.5),
     "餐厅_布置": (96.0, 83.0),
+    "餐厅_制作_点火": (81.0, 87.0),
     "发言": (46.0, 90.0),
     "许愿_继续": (70.0, 75.0),
     "许愿_选项_0": (82.5, 58.0),  # 自下向上，从 0 递增
@@ -210,8 +236,11 @@ slide_positions = {
     "动作": (22.5, 87.5),
 }
 
-# 私房菜操作
-menu_operation = {"浆果捞": ()}
+# 炒菜菜单
+stir_fry_menu = {
+    "浆果捞": "逆-左下上下-顺-灭",
+    "": "",
+}
 
 
 def change_speed(input: float) -> float:
@@ -563,7 +592,7 @@ class Input(object):
     string: str
     backspace: int = 0  # 退格次数
     enter: int = 0  # 回车次数
-    delay_time: int = 1000  # 延迟时间，单位为 ms
+    delay_time: int = 1500  # 延迟时间，单位为 ms
     last_time: int = 1000  # 持续时间，单位为 ms
 
     def generate(self) -> list[dict]:
@@ -655,6 +684,37 @@ class ClickArea(ActionChain):
         self.data.append(Wait(1000))
 
 
+class ExchangeMagicCode(ActionChain):
+    """兑换神奇密码"""
+
+    def __init__(self, codes: Optional[Iterable[str]] = None) -> None:
+        super().__init__()
+        self.data += [
+            ClickButton("活动"),
+            ClickButton("活动_福利"),
+            ClickButton("活动_福利_神奇密码"),
+            ClickButton("活动_福利_神奇密码_神奇密码兑换"),
+        ]
+        if not codes:
+            global magic_codes
+            codes = magic_codes
+        for code in codes:
+            self.do(code)
+        self.data += [
+            ClickButton("活动_X"),
+            Wait(1000),
+        ]
+
+    def do(self, code: str) -> None:
+        self.data += [
+            ClickButton("活动_福利_神奇密码_神奇密码兑换"),
+            ClickButton("活动_福利_神奇密码_神奇密码兑换_输入"),
+            Input(code, enter=1),
+            ClickButton("活动_福利_神奇密码_神奇密码兑换_确定"),
+            ClickButton("屏幕空白"),
+        ]
+
+
 class Speak(ActionChain):
     """发言"""
 
@@ -689,6 +749,7 @@ class Navigate2NPC(ActionChain):
         self.data += [
             ClickButton("地图"),
             Drag(20.0, _y, 80.0, _y),
+            Wait(500),
         ]
 
         # 需要翻页
@@ -714,10 +775,8 @@ class Navigate2NPC(ActionChain):
             self.data += [
                 ClickButton("对话_选项_0"),
                 ClickButton("互动_主"),
-                Wait(1000),
-                ClickButton(
-                    "对话_继续",
-                ),
+                Wait(3000),
+                ClickButton("对话_继续"),
                 Wait(1000),
             ]
 
@@ -793,6 +852,8 @@ class CheckIn(ActionChain):
 class Divine(ActionChain):
     """占卜"""
 
+    确认结果 = (84.5, 63.0)
+
     def __init__(self) -> None:
         super().__init__()
         self.data.append(Navigate2Feature("茜茜占卜"))
@@ -810,7 +871,7 @@ class Divine(ActionChain):
             Wait(3000),
             ClickButton("屏幕空白"),
             Wait(5000),
-            Click(84.5, 63.0, random_delta=0.5),
+            Click(*self.确认结果, random_delta=0.5),
             Wait(1000),
         ]
 
@@ -1198,15 +1259,15 @@ class Talk2NPC(ActionChain):
             "琦琦": 25000,
             "艾米": 10000,
             "汤米": 15000,
-            "克劳": 120000,
-            "弗礼德": 120000,
+            "克劳": 100000,
+            "弗礼德": 100000,
             "茜茜": 120000,
             "贝琪": 30000,
             "艾尔": 150000,
             "尤尤": 150000,
             "菩提": 35000,
             "梅森": 40000,
-            "彩虹": 120000,
+            "彩虹": 100000,
             "瑞琪": 120000,
         }
         self.data.append(ChangeMap("摩尔城堡"))
@@ -1242,10 +1303,42 @@ class Talk2NPC(ActionChain):
 class StirFry(ActionChain):
     """TODO: 炒菜"""
 
-    def __init__(self, n: int) -> None:
+    # 鸡精
+    # 酱油
+    # 番茄酱
+    # 盐
+
+    operation_dict = {
+        "-": Wait(5000),
+        "上": Drag(
+            50.0, 65.0, 50.0, 35.0, delay_time=1000, move_time=500, random_delta=5.0
+        ),
+        "下": Drag(
+            50.0, 35.0, 50.0, 65.0, delay_time=1000, move_time=500, random_delta=5.0
+        ),
+        "左": Drag(
+            35.0, 50.0, 65.0, 50.0, delay_time=1000, move_time=500, random_delta=5.0
+        ),
+        "右": Drag(
+            65.0, 50.0, 35.0, 50.0, delay_time=1000, move_time=500, random_delta=5.0
+        ),
+        "顺": DrawCircle(
+            50.0, 50.0, 25.0, clockwise=True, turns_number=5, last_time=3000
+        ),
+        "逆": DrawCircle(
+            50.0, 50.0, 25.0, clockwise=False, turns_number=5, last_time=3000
+        ),
+        "绿": Drag(23.0, 59.0, 50.0, 50.0, random_delta=1.0),  # 鸡精
+        "棕": Drag(76.0, 64.0, 50.0, 50.0, random_delta=1.0),  # 酱油
+        "红": Drag(14.0, 76.5, 50.0, 50.0, random_delta=1.0),  # 番茄酱
+        "白": Drag(83.0, 76.0, 50.0, 50.0, random_delta=1.0),  # 盐
+        # "灭": ClickArea(),
+    }
+
+    def __init__(self, name: str, n: int) -> None:
         super().__init__()
         for i in range(n):
-            self.do()
+            self.do(name)
 
     def drag(self) -> None:
         self.data += [
@@ -1254,11 +1347,17 @@ class StirFry(ActionChain):
             ClickArea(),
         ]
 
-    def do(self) -> None:
+    def do(self, name: str) -> None:
+        global stir_fry_menu
         self.data += [
             ClickButton("互动_主"),
-            DrawCircle(50.0, 58.0, 15.0, clockwise=True, turns_number=10, last_time=10),
+            ClickButton("餐厅_菜谱_制作"),
+            ClickButton("餐厅_制作_点火", delay_time=5000),
+            Wait(1000),
         ]
+        for word in stir_fry_menu[name]:
+            self.data.append(self.operation_dict[word])
+        self.data += [ClickButton("屏幕空白"), Wait(1000)]
 
 
 class Cook(ActionChain):
@@ -1267,6 +1366,10 @@ class Cook(ActionChain):
     4 个炉子都是空的
     上菜窗口无空缺
     上菜窗口无对应菜品（浆果捞）"""
+
+    浆果捞 = (52.0, 77.5)
+    # 第二列坐标
+    # 浆果捞 = (63.0, 77.5)
 
     def __init__(self, n: int = 10) -> None:
         super().__init__()
@@ -1307,9 +1410,7 @@ class Cook(ActionChain):
             ClickButton("互动_主"),
             ClickButton("餐厅_提示_取消"),  # 相当于点击屏幕空白，防错位
             SlideDown("餐厅_菜单"),
-            Click(52.0, 77.5, random_delta=0.5),
-            # 第二列坐标
-            # Click(63.0, 77.5, random_delta=0.5),
+            Click(*self.浆果捞, random_delta=0.5),
             ClickButton("餐厅_菜谱_快速烹饪"),
             Wait(500),
         ]
@@ -1348,7 +1449,7 @@ class Fish(ActionChain):
         self.data += [
             ClickButton("互动_钓鱼", delay_time=500),  # 下钩
             ClickButton("互动_钓鱼", delay_time=6000),  # 上钩
-            ClickButton("互动_钓鱼", delay_time=2000),  # 收杆
+            ClickButton("互动_钓鱼", delay_time=2060),  # 收杆
             ClickButton("钓鱼_停止钓鱼", delay_time=300),
             ClickButton("屏幕空白", delay_time=2000),
         ]
@@ -1433,6 +1534,7 @@ def debug(
 
 
 if __name__ == "__main__":
+    # debug(StirFry("浆果捞", 5))
 
     # 日常功能
     export(InitSettings(), "初始化设置")
@@ -1462,6 +1564,7 @@ if __name__ == "__main__":
     export(
         GatherJiangGuoCongLin(), "辅助浆果丛林采集", LoopType="UntilStopped", LoopInterval=3600
     )
+    export(ExchangeMagicCode(), "辅助神奇密码兑换")
 
     # 自定义功能
     # export(Speak(), "发言", LoopType="UntilStopped", LoopInterval=120)
