@@ -49,7 +49,6 @@ magic_codes = {
     "下载Ganke领福利",
 }
 
-
 # 按钮位置，左上为 0.0 ，右下为 100.0
 button_positions = {
     "屏幕空白": (50.0, 5.0),
@@ -73,8 +72,6 @@ button_positions = {
     "商城": (24.0, 7.0),
     "商城_X": (92.0, 4.0),
     "商城_礼包": (7.0, 49.0),
-    "商城_礼包_每日": (24.0, 16.0),
-    "商城_礼包_每日_免费": (27.0, 52.5),
     "超级拉姆": (29.0, 7.0),
     "超级拉姆_X": (92.0, 4.0),
     "超级拉姆_每日奖励": (20.0, 88.0),
@@ -821,34 +818,6 @@ class InitSettings(ActionChain):
         ]
 
 
-class CheckIn(ActionChain):
-    """签到"""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.data += [
-            ClickButton("商城"),
-            ClickButton("商城_礼包"),
-            ClickButton("商城_礼包_每日"),
-            ClickButton("商城_礼包_每日_免费"),
-            ClickButton("屏幕空白"),
-            ClickButton("商城_X"),
-            Wait(1000),
-            ClickButton("超级拉姆"),
-            ClickButton("超级拉姆_每日奖励"),
-            ClickButton("超级拉姆_每日奖励_领取"),
-            ClickButton("屏幕空白"),
-            ClickButton("超级拉姆_X"),
-            Wait(1000),
-            ClickButton("SMC"),
-            ClickButton("SMC_每日工资"),
-            ClickButton("SMC_每日工资_马上领取"),
-            ClickButton("屏幕空白"),
-            ClickButton("SMC_X"),
-            Wait(1000),
-        ]
-
-
 class Divine(ActionChain):
     """占卜"""
 
@@ -1216,7 +1185,23 @@ class GatherJiangGuoCongLin(ActionChain):
 
 
 class GatherChengBaoArea(ActionChain):
-    """TODO: 城堡区资源"""
+    """TODO: 城堡区资源采集"""
+
+    def __init__(self, n: int = 1) -> None:
+        super().__init__()
+        for i in range(n):
+            self.do()
+        self.data.append(Wait(1000))
+
+    def do(self) -> None:
+        self.data += [
+            Pick(),
+            ClickButton("骑乘"),
+        ]
+
+
+class GatherMuChangArea(ActionChain):
+    """TODO: 牧场区资源采集"""
 
     def __init__(self, n: int = 1) -> None:
         super().__init__()
@@ -1538,14 +1523,12 @@ if __name__ == "__main__":
 
     # 日常功能
     export(InitSettings(), "初始化设置")
-    export(CheckIn(), "日常签到")
     export(Divine(), "日常占卜")
     export(MakeWish(), "日常许愿")
     export(GuiderMission(), "日常向导任务")
     export(Talk2NPC(), "日常 NPC 好感度对话")
     export(
         InitSettings()
-        + CheckIn()
         + Divine()
         + MakeWish()
         + GuiderMission()
