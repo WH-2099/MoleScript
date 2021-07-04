@@ -712,10 +712,35 @@ class ExchangeMagicCode(ActionChain):
         ]
 
 
+class Color(Enum):
+    """颜色 HEX 枚举"""
+
+    BLACK = "#000000"
+    SILVER = "#C0C0C0"
+    GRAY = "#808080"
+    WHITE = "#FFFFFF"
+    MAROON = "#800000"
+    RED = "#FF0000"
+    PURPLE = "#800080"
+    FUCHSIA = "#FF00FF"
+    GREEN = "#008000"
+    LIME = "#00FF00"
+    OLIVE = "#808000"
+    NAVY = "#000080"
+    YELLOW = "#FFFF00"
+    BLUE = "#0000FF"
+    TEAL = "#008080"
+    AQUA = "#00FFFF"
+
+
 class Speak(ActionChain):
     """发言"""
 
-    def __init__(self, word: str, channel: str = "附近") -> None:
+    def __init__(
+        self, word: str, channel: str = "附近", color: Optional[Color] = None
+    ) -> None:
+        if color:
+            word = f'<color="{color.value}">{word}</color>'
         self.data += [
             ClickButton("发言_输入"),
             ClickButton("发言_" + channel),
@@ -1288,11 +1313,6 @@ class Talk2NPC(ActionChain):
 class StirFry(ActionChain):
     """TODO: 炒菜"""
 
-    # 鸡精
-    # 酱油
-    # 番茄酱
-    # 盐
-
     operation_dict = {
         "-": Wait(5000),
         "上": Drag(
@@ -1482,7 +1502,7 @@ def export(actions: Iterable, name: str, **kwargs) -> None:
     }
     data |= kwargs
     with open(f"./json/{name}.json", "wt", encoding="utf-8") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=4)
     print(f"{name}: {timedelta(milliseconds=timestamp_now)}")
 
 
@@ -1528,11 +1548,7 @@ if __name__ == "__main__":
     export(GuiderMission(), "日常向导任务")
     export(Talk2NPC(), "日常 NPC 好感度对话")
     export(
-        InitSettings()
-        + Divine()
-        + MakeWish()
-        + GuiderMission()
-        + Talk2NPC(),
+        InitSettings() + Divine() + MakeWish() + GuiderMission() + Talk2NPC(),
         "日常整合",
     )
 
