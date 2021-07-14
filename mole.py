@@ -647,6 +647,7 @@ class ResetVisualAngel(ActionChain):
         super().__init__()
         self.data += [
             ClickButton("视角切换"),
+            Wait(1000),
             ClickButton("视角切换"),
             Wait(1000),
         ]
@@ -834,12 +835,12 @@ class InitSettings(ActionChain):
             ClickButton("头像_设置_基础设置__帧数_低"),
             ClickButton("头像_设置_基础设置__最大视野范围_高"),
             ClickButton("头像_设置_基础设置__同屏人数_0", random_delta=0.0),
-            ClickButton("头像_设置_视角设置"),
-            ClickButton("头像_设置_视角设置_2.5D视角"),
             ClickButton("头像_设置_X"),
             ClickButton("头像_设置_X_确定"),
-            Wait(5000),
+            Wait(2000),
+            ResetVisualAngel(),
             ClickButton("屏幕空白"),
+            Wait(1000),
         ]
 
 
@@ -962,7 +963,6 @@ class GatherForest(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ResetVisualAngel(),
             MoveDown(3000),
             MoveLeft(500),
         ]
@@ -1116,7 +1116,6 @@ class GatherNight(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ResetVisualAngel(),
             ChangeMap("摩尔拉雅"),
             GatherMoerlaya(),
             ChangeMap("前哨站"),
@@ -1247,7 +1246,6 @@ class GatherMapResouce(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ResetVisualAngel(),
             ChangeMap("浆果丛林"),
         ]
         self.data.extend(GatherJiangGuoCongLin())
@@ -1384,7 +1382,6 @@ class Cook(ActionChain):
 
     def prepare(self, wait: int) -> None:
         self.data += [
-            ResetVisualAngel(),
             ClickButton("餐厅_菜谱"),
             ClickButton("餐厅_菜谱_前往"),
             Wait(wait),
@@ -1414,14 +1411,14 @@ class Cook(ActionChain):
         self.data += [
             ClickButton("互动_主"),
             ClickButton("餐厅_提示_取消"),  # 相当于点击屏幕空白，防错位
-            SlideDown("餐厅_菜单"),
-            Click(*self.浆果捞, random_delta=0.5),
+            # SlideDown("餐厅_菜单"),
+            # Click(*self.浆果捞, random_delta=0.5),
             ClickButton("餐厅_菜谱_快速烹饪"),
             Wait(500),
         ]
 
     def move_left(self) -> None:
-        self.data.append(MoveLeft(5))
+        self.data.append(MoveLeft(7))
 
 
 class ChooseBait(ActionChain):
@@ -1443,14 +1440,14 @@ class ChooseBait(ActionChain):
 class Fish(ActionChain):
     """钓鱼"""
 
-    def __init__(self, n: int = 200) -> None:
+    def __init__(self, n: int = 220) -> None:
         super().__init__()
         for i in range(n):
             self.do()
         self.append(Wait(1000))
 
     def do(self) -> None:
-        "稳健，不丢饵"
+        "稳健，丢饵适中"
         self.data += [
             ClickButton("互动_钓鱼", delay_time=500),  # 下钩
             ClickButton("互动_钓鱼", delay_time=6000),  # 上钩
@@ -1466,18 +1463,29 @@ class DailyFish(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ResetVisualAngel(),
             ChangeMap("摩尔拉雅"),
+            GetOff(),
+            ClickButton("骑乘"),
+            MoveRight(1000),
+            MoveDown(300),
             ChooseBait(0),
             Fish(),
             ChangeMap("浆果丛林"),
-            ChooseBait(0),
+            GetOff(),
+            ClickButton("骑乘"),
+            MoveDown(700),
+            MoveLeft(5000),
             Fish(),
             ChangeMap("阳光沙滩"),
-            ChooseBait(0),
+            Navigate2NPC("菩提", 15000),
+            ClickButton("对话_选项_0"),
+            Wait(1000),
+            ClickButton("骑乘"),
+            MoveDown(1500),
+            MoveRight(2000),
             Fish(),
+            Wait(1000),
         ]
-        self.append(Wait(1000))
 
 
 def export(actions: Iterable, name: str, **kwargs) -> None:
@@ -1547,9 +1555,22 @@ if __name__ == "__main__":
     export(MakeWish(), "日常许愿")
     export(GuiderMission(), "日常向导任务")
     export(Talk2NPC(), "日常 NPC 好感度对话")
+    export(DailyFish(), "日常钓鱼")
     export(
         InitSettings() + Divine() + MakeWish() + GuiderMission() + Talk2NPC(),
         "日常整合",
+    )
+    export(
+        InitSettings()
+        + ChangeMap("浆果丛林")
+        + GatherJiangGuoCongLin()
+        + Divine()
+        + MakeWish()
+        + GuiderMission()
+        + Talk2NPC()
+        + GatherNight()
+        + DailyFish(),
+        "日常打工人整合",
     )
 
     export(GatherNight(), "日常夜间资源采集")
@@ -1567,4 +1588,4 @@ if __name__ == "__main__":
 
     # 自定义功能
     # export(Speak(), "发言", LoopType="UntilStopped", LoopInterval=120)
-    # export(Cook(), "烹饪")
+    # export(Cook(), "烹饪", LoopType="UntilStopped")
