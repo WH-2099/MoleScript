@@ -30,10 +30,13 @@ from collections import UserList
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from glob import glob
+from os import remove
+from pprint import pp
 from random import randint, uniform
+from sys import exit
 from time import sleep
 from typing import Iterable, Optional
-
 
 # 神奇密码
 magic_codes = {
@@ -93,23 +96,26 @@ button_positions = {
     "任务_向导派遣_前往领奖": (74.5, 81.5),
     "任务_向导派遣_确认": (74.5, 81.5),
     "任务_向导派遣_领奖": (74.5, 81.5),
-    "任务_向导派遣_任务_0": (76.0, 17.0),  # 自上向下，从 0 递增
-    "任务_向导派遣_任务_1": (76.0, 31.0),  # 自上向下，从 0 递增
-    "任务_向导派遣_任务_2": (76.0, 45.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_0": (75.5, 17.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_1": (75.5, 31.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_2": (75.5, 45.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_3": (75.5, 59.0),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务_4": (75.5, 69.5),  # 自上向下，从 0 递增
+    "任务_向导派遣_任务__8": (75.5, 56.5),  # 自上向下，从 0 递增
     "地图": (96.0, 7.0),
     "地图_X": (97.0, 5.5),
-    "地图_浆果丛林": (12.5, 58.0),
-    "地图_摩尔拉雅": (24.0, 23.0),
-    "地图_阳光牧场": (32.5, 59.5),
-    "地图_阳光沙滩": (29.5, 79.0),
-    "地图_前哨站": (43.5, 24.5),
-    "地图_爱心街区": (45.5, 46.0),
-    "地图_摩尔城堡": (56.5, 44.0),
-    "地图_开心农场": (56.0, 75.5),
-    "地图_淘淘乐街": (69.5, 46.5),
-    "地图_随便逛逛": (76.0, 71.5),
+    "地图_浆果丛林": (8.0, 49.0),
+    "地图_摩尔拉雅": (22.0, 17.0),
+    "地图_阳光牧场": (35.0, 59.0),
+    "地图_阳光沙滩": (32.0, 75.0),
+    "地图_前哨站": (45.0, 21.0),
+    "地图_爱心街区": (43.0, 37.0),
+    "地图_摩尔城堡": (57.0, 35.0),
+    "地图_开心农场": (56.0, 71.0),
+    "地图_淘淘乐街": (71.0, 39.0),
+    "地图_随便逛逛": (77.0, 69.0),
     "地图_家园": (7.5, 79.5),
-    "地图_小镇": (13.5, 79.5),
+    "地图_小屋": (13.5, 79.5),
     "地图_餐厅": (19.5, 79.5),
     "地图_角色功能切换": (8.5, 93.0),
     "地图_角色_洛克": (19.0, 93.0),
@@ -562,6 +568,8 @@ class DrawCircle(object):
         theta = 0.0
         d_theta = math.pi * 2 / self.fragment_number
         d_theta = -d_theta if self.clockwise else +d_theta  #  数学坐标系顺时针为负向
+        _x = self.x
+        _y = self.y
         for i in range(self.turns_number * self.fragment_number):
             timestamp_now += d_time
             theta += d_theta
@@ -617,10 +625,10 @@ class ActionChain(UserList):
             l += action.generate()
         return l
 
-    def __add__(self, other: "ActionChain") -> "ActionChain":
+    def __add__(self, other: Iterable) -> "ActionChain":
         result = ActionChain()
-        result.data.extend(self.data)
-        result.data.extend(other.data)
+        result.extend(self)
+        result.extend(other)
         return result
 
     def __mul__(self, other: int) -> "ActionChain":
@@ -672,9 +680,9 @@ class ClickArea(ActionChain):
         self, x0: float, y0: float, x1: float, y1: float, delta: float = 10.0, **kwargs
     ) -> None:
         super().__init__()
-        for i in range((x1 - x0) // delta):
+        for i in range(int((x1 - x0) // delta)):
             x = x0 + (i + 1) * delta
-            for j in range((y1 - y0) // delta):
+            for j in range(int((y1 - y0) // delta)):
                 y = y0 + (j + 1) * delta
                 self.data.append(
                     Click(x, y, delay_time=100 + randint(0, 50), **kwargs)
@@ -754,7 +762,7 @@ class Speak(ActionChain):
 class ChangeMap(ActionChain):
     """更换地图"""
 
-    def __init__(self, name: str, last_time: int = 120000) -> None:
+    def __init__(self, name: str, last_time: int = 2 * 60 * 1000) -> None:
         super().__init__()
         self.data += [
             ClickButton("地图"),
@@ -766,7 +774,7 @@ class ChangeMap(ActionChain):
 class Navigate2NPC(ActionChain):
     """NPC 导航"""
 
-    def __init__(self, name: str, last_time: int = 120000) -> None:
+    def __init__(self, name: str, last_time: int = 2 * 60 * 1000) -> None:
         super().__init__()
         _y = button_positions["地图_角色功能切换"][1]
         self.data += [
@@ -807,7 +815,7 @@ class Navigate2NPC(ActionChain):
 class Navigate2Feature(ActionChain):
     """功能导航"""
 
-    def __init__(self, name: str, last_time: int = 120000) -> None:
+    def __init__(self, name: str, last_time: int = 2 * 60 * 1000) -> None:
         super().__init__()
         self.data += [
             ClickButton("地图"),
@@ -838,8 +846,8 @@ class InitSettings(ActionChain):
             ClickButton("头像_设置_X"),
             ClickButton("头像_设置_X_确定"),
             Wait(2000),
-            ResetVisualAngel(),
             ClickButton("屏幕空白"),
+            ResetVisualAngel(),
             Wait(1000),
         ]
 
@@ -849,9 +857,12 @@ class Divine(ActionChain):
 
     确认结果 = (84.5, 63.0)
 
-    def __init__(self) -> None:
+    def __init__(self, change_map: bool = True) -> None:
         super().__init__()
-        self.data.append(Navigate2Feature("茜茜占卜"))
+        if change_map:
+            self.data.append(ChangeMap("摩尔拉雅"))
+
+        self.data.append(Navigate2Feature("茜茜占卜", 25 * 1000))
         self.refresh_conversation(5)
         self.data += [
             ClickButton("对话_选项_3"),
@@ -884,11 +895,13 @@ class Divine(ActionChain):
 class MakeWish(ActionChain):
     """许愿"""
 
-    def __init__(self) -> None:
+    def __init__(self, change_map: bool = True) -> None:
         super().__init__()
+        if change_map:
+            self.data.append(ChangeMap("爱心街区"))
+
         self.data += [
-            ChangeMap("爱心街区"),
-            Navigate2Feature("城堡许愿池", 3000),
+            Navigate2Feature("城堡许愿池", 30000),
             ClickButton("互动_主"),
             Wait(3000),
             ClickButton("许愿_继续"),
@@ -908,36 +921,37 @@ class MakeWish(ActionChain):
 class GuiderMission(ActionChain):
     """向导任务
     穿向导服
-    默认选头三个任务：摩尔城堡，摩尔拉雅雪山，浆果丛林"""
+    默认选摩尔城堡的三个任务"""
 
-    def __init__(self) -> None:
+    def __init__(self, change_map: bool = True) -> None:
         super().__init__()
+        if change_map:
+            self.data.append(ChangeMap("摩尔城堡"))
+
         self.data += [
-            ChangeMap("摩尔城堡"),
             ClickButton("任务"),
             ClickButton("任务_向导派遣"),
             ClickButton("任务_向导派遣_接取任务"),
-            Wait(10000),
+            Wait(10 * 1000),
+            ClickButton("对话_继续"),
             ClickButton("对话_选项_3"),
             Wait(1000),
             ClickButton("任务_向导派遣_任务_0"),
-            ClickButton("任务_向导派遣_任务_1"),
-            ClickButton("任务_向导派遣_任务_2"),
+            ClickButton("任务_向导派遣_任务_4"),
+            SlideDown("任务_向导派遣"),
+            SlideDown("任务_向导派遣"),
+            SlideDown("任务_向导派遣"),
+            ClickButton("任务_向导派遣_任务__8"),
             ClickButton("任务_向导派遣_确认"),
             ClickButton("屏幕空白"),
             Wait(1000),
         ]
 
         self.do()  # 接取任务后就在摩尔城堡，无须换图
-        self.do("摩尔拉雅")
-        self.do("浆果丛林")
 
         self.data += [
-            ChangeMap("摩尔城堡"),
-            ClickButton("任务"),
-            ClickButton("任务_向导派遣"),
-            ClickButton("任务_向导派遣_前往领奖"),
-            Wait(10000),
+            ClickButton("互动_主"),
+            ClickButton("对话_继续"),
             ClickButton("对话_选项_3"),
             ClickButton("任务_向导派遣_领奖"),
             ClickButton("屏幕空白"),
@@ -960,8 +974,13 @@ class GatherForest(ActionChain):
     """伐木林资源采集
     不保证全部采集，但刷满 SMC 经验足以"""
 
-    def __init__(self) -> None:
+    def __init__(self, change_map: bool = True) -> None:
         super().__init__()
+
+        # TODO: 怎么到伐木林？？？
+        if change_map:
+            pass
+
         self.data += [
             MoveDown(3000),
             MoveLeft(500),
@@ -994,8 +1013,11 @@ class GatherMoerlaya(ActionChain):
     5 个白浆果
     夜间 5轮"""
 
-    def __init__(self, n: int = 5) -> None:
+    def __init__(self, change_map: bool = True, n: int = 5) -> None:
         super().__init__()
+        if change_map:
+            self.data.append(ChangeMap("摩尔拉雅"))
+
         for i in range(5):
             self.do()
         self.data.append(Wait(1000))
@@ -1016,7 +1038,7 @@ class GatherMoerlaya(ActionChain):
             MoveDown(4500),
             MoveRight(500),
             Pick(),
-            Navigate2NPC("茜茜", 20000),
+            Navigate2NPC("茜茜", 20 * 1000),
             ClickButton("对话_选项_0"),
             MoveRight(100),
             MoveDown(1200),
@@ -1026,7 +1048,7 @@ class GatherMoerlaya(ActionChain):
             MoveUp(500),
             MoveRight(300),
             Pick(),
-            ChangeMap("摩尔拉雅", 25000),
+            ChangeMap("摩尔拉雅", 25 * 1000),
         ]
 
 
@@ -1036,22 +1058,22 @@ class GatherQianShaoZhan(ActionChain):
     1 个草丛（剩余两个草丛距离远，而黑浆果刷新快，暂时不采集）
     夜间 5 轮"""
 
-    def __init__(self, n: int = 5) -> None:
+    def __init__(self, change_map: bool = True, n: int = 5) -> None:
         super().__init__()
-        self.prepare()
-        for i in range(n):
-            self.do()
-        self.data.append(Wait(1000))
+        if change_map:
+            self.data.append(ChangeMap("前哨站"))
 
-    def prepare(self) -> None:
         self.data += [
-            Navigate2NPC("瑞琪", 30000),
+            Navigate2NPC("瑞琪", 30 * 1000),
             ClickButton("对话_选项_0"),
             ClickButton("骑乘"),
             MoveDown(1300),
             MoveRight(3500),
             MoveUp(1000),
         ]
+        for i in range(n):
+            self.do()
+        self.data.append(Wait(1000))
 
     def do(self) -> None:
         """13 个黑浆果"""
@@ -1106,6 +1128,7 @@ class GatherQianShaoZhan(ActionChain):
             ClickButton("骑乘"),
             MoveRight(500),
             MoveUp(4500),
+            Wait(5000),
         ]
 
 
@@ -1116,10 +1139,9 @@ class GatherNight(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ChangeMap("摩尔拉雅"),
             GatherMoerlaya(),
-            ChangeMap("前哨站"),
             GatherQianShaoZhan(),
+            Wait(1000),
         ]
 
 
@@ -1129,10 +1151,18 @@ class GatherJiangGuoCongLin(ActionChain):
     5 个橙浆果
     5 个草丛"""
 
-    def __init__(self, n: int = 1) -> None:
+    def __init__(self, change_map: bool = True, n: int = 5) -> None:
         super().__init__()
-        for i in range(n):
+        if change_map:
+            self.data.append(ChangeMap("浆果丛林"))
+
+        if n == 1:
             self.do()
+        else:
+            for i in range(n):
+                self.do()
+                self.data.append(Wait(60 * 60 * 1000))
+
         self.data.append(Wait(1000))
 
     def do(self) -> None:
@@ -1211,7 +1241,7 @@ class GatherJiangGuoCongLin(ActionChain):
 class GatherChengBaoArea(ActionChain):
     """TODO: 城堡区资源采集"""
 
-    def __init__(self, n: int = 1) -> None:
+    def __init__(self, change_map: bool = True, n: int = 1) -> None:
         super().__init__()
         for i in range(n):
             self.do()
@@ -1227,7 +1257,7 @@ class GatherChengBaoArea(ActionChain):
 class GatherMuChangArea(ActionChain):
     """TODO: 牧场区资源采集"""
 
-    def __init__(self, n: int = 1) -> None:
+    def __init__(self, change_map: bool = True, n: int = 1) -> None:
         super().__init__()
         for i in range(n):
             self.do()
@@ -1246,43 +1276,44 @@ class GatherMapResouce(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ChangeMap("浆果丛林"),
+            GatherJiangGuoCongLin(),
         ]
-        self.data.extend(GatherJiangGuoCongLin())
 
 
 class Talk2NPC(ActionChain):
     """NPC 对话好感度"""
 
-    def __init__(self) -> None:
+    NPCs = {
+        # "姓名": 转场耗时（单位 ms）
+        "杰西": 10 * 1000,
+        "洛克": 10 * 1000,
+        "尼克": 5000,
+        "埃里克斯": 10 * 1000,
+        "丝尔特": 5000,
+        "花婶": 10 * 1000,
+        "琦琦": 25 * 1000,
+        "艾米": 10 * 1000,
+        "汤米": 15 * 1000,
+        "克劳": 100 * 1000,
+        "弗礼德": 100 * 1000,
+        "茜茜": 120 * 1000,
+        "贝琪": 30 * 1000,
+        "艾尔": 150 * 1000,
+        "尤尤": 150 * 1000,
+        "菩提": 35 * 1000,
+        "梅森": 40 * 1000,
+        "彩虹": 100 * 1000,
+        "瑞琪": 120 * 1000,
+    }
+
+    def __init__(self, change_map: bool = True) -> None:
         super().__init__()
-        self.NPCs = {
-            # "姓名": 转场耗时（单位 ms）
-            "杰西": 10000,
-            "洛克": 10000,
-            "尼克": 5000,
-            "埃里克斯": 10000,
-            "丝尔特": 5000,
-            "花婶": 10000,
-            "琦琦": 25000,
-            "艾米": 10000,
-            "汤米": 15000,
-            "克劳": 100000,
-            "弗礼德": 100000,
-            "茜茜": 120000,
-            "贝琪": 30000,
-            "艾尔": 150000,
-            "尤尤": 150000,
-            "菩提": 35000,
-            "梅森": 40000,
-            "彩虹": 100000,
-            "瑞琪": 120000,
-        }
-        self.data.append(ChangeMap("摩尔城堡"))
+        if change_map:
+            self.data.append(ChangeMap("摩尔城堡"))
+
         for name, time in self.NPCs.items():
             self.data.append(Navigate2NPC(name, time))
             self.do(name)
-
         self.data.append(Wait(1000))
 
     def next(self) -> None:
@@ -1342,12 +1373,13 @@ class StirFry(ActionChain):
         super().__init__()
         for i in range(n):
             self.do(name)
+        self.data.append(Wait(1000))
 
     def drag(self) -> None:
         self.data += [
-            Drag(delay_time=100),
-            Drag(delay_time=100),
-            ClickArea(),
+            # Drag(delay_time=100),
+            # Drag(delay_time=100),
+            # ClickArea(),
         ]
 
     def do(self, name: str) -> None:
@@ -1379,6 +1411,7 @@ class Cook(ActionChain):
         self.prepare(wait=8000)
         for i in range(n):
             self.do()
+        self.data.append(Wait(1000))
 
     def prepare(self, wait: int) -> None:
         self.data += [
@@ -1393,7 +1426,7 @@ class Cook(ActionChain):
             self.move_left()
 
         self.prepare(wait=0)
-        self.data.append(Wait(50000))
+        self.data.append(Wait(50 * 1000))
 
         for i in range(4):
             self.get()
@@ -1440,8 +1473,49 @@ class ChooseBait(ActionChain):
 class Fish(ActionChain):
     """钓鱼"""
 
-    def __init__(self, n: int = 220) -> None:
+    def __init__(self, change_map: Optional[str] = None, n: int = 200) -> None:
         super().__init__()
+        if change_map == "摩尔拉雅":
+            self.data += [
+                ChangeMap("摩尔拉雅"),
+                GetOff(),
+                ClickButton("骑乘"),
+                MoveRight(1000),
+                MoveDown(300),
+            ]
+        elif change_map == "浆果丛林":
+            self.data += [
+                ChangeMap("浆果丛林"),
+                GetOff(),
+                ClickButton("骑乘"),
+                MoveDown(700),
+                MoveLeft(5000),
+            ]
+        elif change_map == "阳光沙滩":
+            self.data += [
+                ChangeMap("阳光沙滩"),
+                Navigate2NPC("菩提", 15 * 000),
+                ClickButton("对话_选项_0"),
+                Wait(1000),
+                ClickButton("骑乘"),
+                MoveDown(1500),
+                MoveRight(2000),
+            ]
+        elif change_map == "黑森林":
+            # TODO: 黑森林
+            self.data += [
+                ChangeMap(""),
+            ]
+        elif change_map == "家园鱼塘":
+            self.data += [
+                ChangeMap("小屋"),
+                MoveLeft(1000),
+                ClickButton("互动_主"),
+                Wait(90 * 1000),
+                MoveLeft(1200),
+                MoveUp(900),
+            ]
+
         for i in range(n):
             self.do()
         self.append(Wait(1000))
@@ -1458,33 +1532,43 @@ class Fish(ActionChain):
 
 
 class DailyFish(ActionChain):
-    """TODO: 日常钓鱼"""
+    """日常钓鱼"""
 
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            ChangeMap("摩尔拉雅"),
-            GetOff(),
-            ClickButton("骑乘"),
-            MoveRight(1000),
-            MoveDown(300),
-            ChooseBait(0),
-            Fish(),
-            ChangeMap("浆果丛林"),
-            GetOff(),
-            ClickButton("骑乘"),
-            MoveDown(700),
-            MoveLeft(5000),
-            Fish(),
-            ChangeMap("阳光沙滩"),
-            Navigate2NPC("菩提", 15000),
-            ClickButton("对话_选项_0"),
-            Wait(1000),
-            ClickButton("骑乘"),
-            MoveDown(1500),
-            MoveRight(2000),
-            Fish(),
-            Wait(1000),
+            Fish(change_map="摩尔拉雅"),
+            Fish(change_map="浆果丛林"),
+            Fish(change_map="阳光沙滩"),
+            # Fish(change_map="黑森林"),
+            Fish(change_map="家园鱼塘"),
+        ]
+
+
+class Daily(ActionChain):
+    """日常整合"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.data += [
+            InitSettings(),
+            GatherJiangGuoCongLin(n=1),
+            GuiderMission(),
+            Divine(),
+            MakeWish(),
+            Talk2NPC(),
+            Fish("摩尔拉雅", 100),
+            GatherJiangGuoCongLin(n=1),
+            Fish("摩尔拉雅", 100),
+            Fish("浆果丛林", 200),
+            GatherJiangGuoCongLin(n=1),
+            Fish("阳光沙滩", 200),
+            Fish("家园鱼塘", 100),
+            GatherJiangGuoCongLin(n=1),
+            Fish("家园鱼塘", 100),
+            GatherNight(),
+            Wait(10 * 60 * 1000),
+            GatherJiangGuoCongLin(n=1),
         ]
 
 
@@ -1519,11 +1603,6 @@ def debug(
 ) -> None:
     """DEBUG"""
 
-    from glob import glob
-    from os import remove
-    from pprint import pp
-    from sys import exit
-
     if remove_old_files and (debug_files := glob("./json/DEBUG*")):
         for f in debug_files:
             remove(f)
@@ -1547,7 +1626,12 @@ def debug(
 
 
 if __name__ == "__main__":
+    # debug(Fish("家园鱼塘"))
     # debug(StirFry("浆果捞", 5))
+
+    # 删除老版本 json 文件
+    for f in glob("./json/*.json"):
+        remove(f)
 
     # 日常功能
     export(InitSettings(), "初始化设置")
@@ -1556,34 +1640,17 @@ if __name__ == "__main__":
     export(GuiderMission(), "日常向导任务")
     export(Talk2NPC(), "日常 NPC 好感度对话")
     export(DailyFish(), "日常钓鱼")
-    export(
-        InitSettings() + Divine() + MakeWish() + GuiderMission() + Talk2NPC(),
-        "日常整合",
-    )
-    export(
-        InitSettings()
-        + ChangeMap("浆果丛林")
-        + GatherJiangGuoCongLin()
-        + Divine()
-        + MakeWish()
-        + GuiderMission()
-        + Talk2NPC()
-        + GatherNight()
-        + DailyFish(),
-        "日常打工人整合",
-    )
+    export(Daily(), "日常整合")
 
     export(GatherNight(), "日常夜间资源采集")
 
     # 辅助功能
     export([ClickButton("互动_主", delay_time=300)], "辅助互动", LoopType="UntilStopped")
-    export(Fish(1), "辅助钓鱼", LoopType="UntilStopped")
-    export(GatherForest(), "辅助伐木林采集")
-    export(GatherMoerlaya(), "辅助摩尔拉雅采集")
-    export(GatherQianShaoZhan(), "辅助前哨站采集")
-    export(
-        GatherJiangGuoCongLin(), "辅助浆果丛林采集", LoopType="UntilStopped", LoopInterval=3600
-    )
+    export(Fish(n=1), "辅助钓鱼", LoopType="UntilStopped")
+    export(GatherForest(change_map=False), "辅助伐木林采集")
+    export(GatherMoerlaya(change_map=False), "辅助摩尔拉雅采集")
+    export(GatherQianShaoZhan(change_map=False), "辅助前哨站采集")
+    export(GatherJiangGuoCongLin(change_map=False), "辅助浆果丛林采集")
     export(ExchangeMagicCode(), "辅助神奇密码兑换")
 
     # 自定义功能
