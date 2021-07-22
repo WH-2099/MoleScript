@@ -1,21 +1,21 @@
 {
     "Acceleration": 1,
-    "CreationTime": "20210721T215008",
+    "CreationTime": "20210722T105655",
     "DoNotShowWindowOnFinish": false,
     "Events": [
         {
             "Delta": 0,
             "EventType": "MouseDown",
             "Timestamp": 300,
-            "X": 84.37522766705582,
-            "Y": 75.539047179028
+            "X": 84.51340560238746,
+            "Y": 75.13341638742651
         },
         {
             "Delta": 0,
             "EventType": "MouseUp",
             "Timestamp": 330,
-            "X": 84.37522766705582,
-            "Y": 75.539047179028
+            "X": 84.51340560238746,
+            "Y": 75.13341638742651
         }
     ],
     "LoopDuration": 0,
