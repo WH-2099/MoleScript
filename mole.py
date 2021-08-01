@@ -66,9 +66,9 @@ button_positions = {
     "头像_设置_基础设置_画面质量_流畅": (27.5, 57.0),
     "头像_设置_基础设置_渲染品质_低": (33.0, 66.0),
     "头像_设置_基础设置_刘海屏_关": (33.0, 75.5),
-    "头像_设置_基础设置__帧数_低": (25.0, 39.0),
-    "头像_设置_基础设置__最大视野范围_高": (42.0, 47.5),
-    "头像_设置_基础设置__同屏人数_0": (29.1, 56.9),
+    "头像_设置_基础设置__帧数_低": (25.0, 21.0),
+    "头像_设置_基础设置__最大视野范围_高": (42.0, 28.5),
+    "头像_设置_基础设置__同屏人数_0": (29.0, 38.5),
     "头像_设置_视角设置": (95.0, 26.0),
     "头像_设置_视角设置_2.5D视角": (30.0, 47.0),
     "头像_设置_视角设置_3D视角": (65.0, 47.0),
@@ -106,14 +106,14 @@ button_positions = {
     "地图": (96.0, 7.0),
     "地图_X": (97.0, 5.5),
     "地图_浆果丛林": (12.5, 58.0),
-    "地图_摩尔拉雅": (24.0, 10.0),
+    "地图_摩尔拉雅": (20.0, 18.0),
     "地图_阳光牧场": (26.5, 58.5),
     "地图_阳光沙滩": (29.5, 78.5),
-    "地图_前哨站": (41.5, 20.5),
+    "地图_前哨站": (41.0, 20.5),
     "地图_爱心街区": (43.0, 33.0),
     "地图_摩尔城堡": (56.5, 27.0),
     "地图_开心农场": (56.0, 76.0),
-    "地图_淘淘乐街": (71.0, 33.5),
+    "地图_淘淘乐街": (69.5, 48.5),
     "地图_随便逛逛": (77.0, 69.0),
     "地图_家园": (7.5, 79.5),
     "地图_小屋": (13.5, 79.5),
@@ -768,10 +768,11 @@ class ChangeMap(ActionChain):
         self.data += [
             ClickButton("地图"),
             ClickButton("地图_" + name),
-            Wait(last_time // 2),
-            ClickButton("地图"),
-            ClickButton("地图_" + name),
-            Wait(last_time // 2),
+            Wait(last_time),
+            # Wait(last_time // 2),
+            # ClickButton("地图"),
+            # ClickButton("地图_" + name),
+            # Wait(last_time // 2),
         ]
 
 
@@ -878,9 +879,9 @@ class Divine(ActionChain):
                 uniform(70.0, 80.0),
                 random_delta=1.0,
             ),
-            Wait(3000),
-            ClickButton("屏幕空白"),
             Wait(5000),
+            ClickButton("屏幕空白"),
+            Wait(3000),
             Click(*self.确认结果, random_delta=0.5),
             ChangeMap("摩尔拉雅", 30 * 1000),
         ]
@@ -1284,17 +1285,20 @@ class GatherMapResouce(ActionChain):
             GatherJiangGuoCongLin(),
         ]
 
+
 class WrappingGift(ActionChain):
     """TODO: 包装礼物"""
-    def __init__(self,change_map:bool=True):
+
+    def __init__(self, change_map: bool = True):
         super().__init__()
         if change_map:
             self.data.append(ChangeMap("开心街区"))
 
-        self.data +=[
+        self.data += [
             Navigate2NPC("琦琦"),
             ClickButton("对话"),
         ]
+
 
 class Talk2NPC(ActionChain):
     """NPC 对话好感度"""
@@ -1542,8 +1546,12 @@ class Fish(ActionChain):
         elif change_map == "黑森林":
             # TODO: 黑森林
             self.data += [
-                ChangeMap("前哨站"),
-                MoveRight(1500),
+                Navigate2NPC("瑞琪", 5000),#
+                ClickButton("对话_选项_0"),
+                ClickButton("骑乘"),
+                MoveDown(1300),
+                MoveRight(14700),
+                MoveDown(7500),
             ]
         elif change_map == "家园鱼塘":
             self.data += [
@@ -1551,7 +1559,7 @@ class Fish(ActionChain):
                 MoveLeft(1000),
                 ClickButton("互动_主"),
                 Wait(90 * 1000),
-                MoveLeft(1200),
+                MoveLeft(1100),
                 MoveUp(900),
             ]
 
@@ -1590,9 +1598,9 @@ class Daily(ActionChain):
     def __init__(self) -> None:
         super().__init__()
         self.data += [
-            InitSettings(),
-            GatherJiangGuoCongLin(n=1),
+            ResetVisualAngel(),
             Divine(),
+            GatherJiangGuoCongLin(n=1),
             MakeWish(),
             GuiderMission(change_map=False),
             Talk2NPC(change_map=False),
@@ -1667,7 +1675,7 @@ def debug(
 
 if __name__ == "__main__":
     # debug(GatherForest() * 3 + GatherNight())
-    # debug(Fish("家园鱼塘"))
+    # debug(Fish("黑森林"))
     # debug(StirFry("浆果捞", 5))
 
     # 删除老版本 json 文件
