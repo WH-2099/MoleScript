@@ -105,6 +105,7 @@ button_positions = {
     "任务_向导派遣_任务__8": (75.5, 56.5),  # 自上向下，从 0 递增
     "地图": (96.0, 7.0),
     "地图_X": (97.0, 5.5),
+    "地图_切换": (6.0, 9.0),
     "地图_浆果丛林": (12.5, 58.0),
     "地图_摩尔拉雅": (20.0, 18.0),
     "地图_阳光牧场": (26.5, 58.5),
@@ -678,7 +679,14 @@ class ClickArea(ActionChain):
     """区域点击"""
 
     def __init__(
-        self, x0: float, y0: float, x1: float, y1: float, delta: float = 10.0, **kwargs
+        self,
+        x0: float,
+        y0: float,
+        x1: float,
+        y1: float,
+        delta: float = 10.0,
+        interval_time: int = 100,
+        **kwargs,
     ) -> None:
         super().__init__()
         for i in range(int((x1 - x0) // delta)):
@@ -686,8 +694,8 @@ class ClickArea(ActionChain):
             for j in range(int((y1 - y0) // delta)):
                 y = y0 + (j + 1) * delta
                 self.data.append(
-                    Click(x, y, delay_time=100 + randint(0, 50), **kwargs)
-                )  #  加入随机延迟
+                    Click(x, y, delay_time=interval_time + randint(0, 30), **kwargs)
+                )
         self.data.append(Wait(1000))
 
 
@@ -767,7 +775,7 @@ class ChangeMap(ActionChain):
         super().__init__()
         self.data += [
             ClickButton("地图"),
-            ClickButton("地图_" + name),
+            ClickButton("地图_" + name, delay_time=2000),
             Wait(last_time),
             # Wait(last_time // 2),
             # ClickButton("地图"),
@@ -785,7 +793,7 @@ class Navigate2NPC(ActionChain):
         self.data += [
             ClickButton("地图"),
             Drag(20.0, _y, 80.0, _y),
-            Wait(500),
+            Wait(1000),
         ]
 
         # 需要翻页
@@ -798,8 +806,11 @@ class Navigate2NPC(ActionChain):
             "瑞琪",
             "菩提",
         ):
-            self.data.append(Drag(80.0, _y, 20.0, _y))
             name = "_" + name
+            self.data += [
+                Drag(80.0, _y, 20.0, _y),
+                Wait(1000),
+            ]
 
         self.data += [
             ClickButton("地图_角色_" + name),
@@ -1386,7 +1397,9 @@ class StirFry(ActionChain):
         "棕": Drag(76.0, 64.0, 50.0, 50.0, random_delta=1.0),  # 酱油
         "红": Drag(14.0, 76.5, 50.0, 50.0, random_delta=1.0),  # 番茄酱
         "白": Drag(83.0, 76.0, 50.0, 50.0, random_delta=1.0),  # 盐
-        # "灭": ClickArea(),
+        "灭": ClickArea(
+            5.0, 60.0, 95.0, 95.0, delta=5.0, interval_time=50, click_times=3
+        ),  # 灭火
     }
 
     def __init__(self, name: str, n: int) -> None:
@@ -1544,14 +1557,19 @@ class Fish(ActionChain):
                 MoveRight(2000),
             ]
         elif change_map == "黑森林":
-            # TODO: 黑森林
             self.data += [
-                Navigate2NPC("瑞琪", 5000),#
+                ChangeMap("前哨站"),
+                Navigate2NPC("瑞琪", 30 * 1000),
                 ClickButton("对话_选项_0"),
                 ClickButton("骑乘"),
                 MoveDown(1300),
                 MoveRight(14700),
                 MoveDown(7500),
+                Wait(2 * 60 * 1000),
+                GetOff(),
+                ClickButton("骑乘"),
+                MoveRight(30 * 1000),
+                MoveUp(2500),
             ]
         elif change_map == "家园鱼塘":
             self.data += [
@@ -1559,12 +1577,20 @@ class Fish(ActionChain):
                 MoveLeft(1000),
                 ClickButton("互动_主"),
                 Wait(90 * 1000),
-                MoveLeft(1100),
+                MoveLeft(1000),
                 MoveUp(900),
             ]
 
         for i in range(n):
             self.do()
+
+        # 黑森林地图特殊，切回到正常地图
+        if change_map == "黑森林":
+            self.data += [
+                ClickButton("家园"),
+                Wait(2 * 60 * 1000),
+            ]
+
         self.append(Wait(1000))
 
     def do(self) -> None:
@@ -1587,7 +1613,7 @@ class DailyFish(ActionChain):
             Fish(change_map="摩尔拉雅"),
             Fish(change_map="浆果丛林"),
             Fish(change_map="阳光沙滩"),
-            # Fish(change_map="黑森林"),
+            Fish(change_map="黑森林"),
             Fish(change_map="家园鱼塘"),
         ]
 
@@ -1610,13 +1636,12 @@ class Daily(ActionChain):
             Fish("浆果丛林", 200),
             GatherJiangGuoCongLin(n=1),
             Fish("阳光沙滩", 200),
-            Fish("家园鱼塘", 100),
+            Fish("黑森林", 100),
             GatherJiangGuoCongLin(n=1),
-            Fish("家园鱼塘", 100),
+            Fish("黑森林", 100),
+            Fish("家园鱼塘", 200),
+            GatherJiangGuoCongLin(n=1),
             GatherNight(),
-            ExchangeMagicCode(),
-            Wait(10 * 60 * 1000),
-            GatherJiangGuoCongLin(n=1),
         ]
 
 
@@ -1689,9 +1714,8 @@ if __name__ == "__main__":
     export(GuiderMission(), "日常向导任务")
     export(Talk2NPC(), "日常 NPC 好感度对话")
     export(DailyFish(), "日常钓鱼")
-    export(Daily(), "日常整合")
-
     export(GatherNight(), "日常夜间资源采集")
+    export(Daily(), "日常整合")
 
     # 辅助功能
     export([ClickButton("互动_主", delay_time=300)], "辅助互动", LoopType="UntilStopped")
